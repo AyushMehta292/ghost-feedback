@@ -17,7 +17,13 @@ export async function pingDatabase(): Promise<{ ok: boolean; error?: string }> {
       const db = await mongoose.connect(uri, {});
       connection.isConnected = db.connections[0].readyState;
     }
-    await mongoose.connection.db.admin().command({ ping: 1 });
+
+    const db = mongoose.connection.db;
+    if (!db) {
+      return { ok: false, error: "Database connection not established" };
+    }
+
+    await db.admin().command({ ping: 1 });
     return { ok: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Database ping failed";
