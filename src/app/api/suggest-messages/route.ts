@@ -1,34 +1,40 @@
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { streamText, StreamingTextResponse } from 'ai';
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAIStream, StreamingTextResponse } from "ai";
 
-const google = createGoogleGenerativeAI({
-  apiKey: process.env.GOOGLE_API_KEY,
-});
+const MODEL = "gemini-2.5-flash-lite";
 
-// Allow streaming responses up to 30 seconds
+const PROMPT =
+  "Return exactly 3 friendly anonymous message prompts for a social app. Output one line only, questions separated by || with no numbering or extra text. Example: What's a hobby you enjoy?||What song are you looping lately?||What's your comfort food?";
+
 export const maxDuration = 30;
 
-export async function POST(req: Request) {
+export async function POST() {
   try {
+    const apiKey = process.env.GOOGLE_API_KEY;
+    if (!apiKey) {
+      return Response.json(
+        { error: "GOOGLE_API_KEY is not configured" },
+        { status: 500 }
+      );
+    }
 
-    const prompt =
-      "Create a list of three open-ended and engaging questions formatted as a single string. Each question should be separated by '||'. These questions are for an anonymous social messaging platform, like Qooh.me, and should be suitable for a diverse audience. Avoid personal or sensitive topics, focusing instead on universal themes that encourage friendly interaction. For example, your output should be structured like this: 'What's a hobby you've recently started?||If you could have dinner with any historical figure, who would it be?||What's a simple thing that makes you happy?'. Ensure the questions are intriguing, foster curiosity, and contribute to a positive and welcoming conversational environment.";
-
-
-
-    const result = await streamText({
-      model: google('models/gemini-pro'),
-      prompt,
-      temperature: 0.8,
-      topP: 0.9,
-      maxTokens: 128  
-
-
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({
+      model: MODEL,
+      generationConfig: {
+        maxOutputTokens: 80,
+        temperature: 0.8,
+      },
     });
-    console.log(result);
-    return result.toAIStreamResponse();
+
+    const result = await model.generateContentStream(PROMPT);
+    const stream = GoogleGenerativeAIStream(result);
+    return new StreamingTextResponse(stream);
   } catch (error) {
-    console.error("An unexpected error occurred:", error);
-    throw error;
+    console.error("suggest-messages error:", error);
+    return Response.json(
+      { error: "Failed to generate message suggestions" },
+      { status: 500 }
+    );
   }
 }
